@@ -1,0 +1,1 @@
+code for an API that takes in a chest x-ray and classifies it as pneumonic or normal.

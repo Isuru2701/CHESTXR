@@ -5,7 +5,6 @@ import numpy as np
 import cv2
 from tensorflow.keras.models import load_model
 
-
 app = Flask(__name__)
 
 CORS(app)
@@ -21,56 +20,38 @@ def predict_image():
     
     file = request.files['image']
     #convert file to np 2d array
-    file = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
-    image = preprocess_image(file)
-    prediction = predict(image)
-    print(prediction)
+    img = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
     
-    return jsonify({'prediction': 1 if prediction[0][0] > 0.5 else 0})
+    predictions = model.predict([preprocess_image(np.array(img))])
+    predicted_labels = np.round(predictions).astype(int)
+    predicted_labels
 
-@app.route('/yolo', methods=['POST'])
-def yolo_model():
-    if 'image' not in request.files:
-        return jsonify({'error': 'No image provided'}), 400
+    print("PRED: ", predicted_labels)
     
-    file = request.files['image']
-    #convert file to np 2d array
-    file = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
+    return jsonify({'prediction': 1 if predicted_labels[0][0] > 0.5 else 0})
 
-def preprocess_image(image:np.array):
-    # Resize to 256x256
-    image = cv2.resize(image, (256, 256))
-    cv2.imshow('image', image)
-    #Apply CLAHE
-    image = apply_CLAHE(image)
-    #Apply Sharpen
-    image = apply_sharpen(image)    
-    # Normalize to [0, 1]
+def preprocess_image(image):
+    # Read the image
+    # Convert the image to RGB (if it's in BGR format)
+    # image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    # Apply CLAHE
+    image = apply_clahe(image)
+    # Resize the image to match the input size of the model
+    image = cv2.resize(image, (224, 224))
+    # Normalize the image
     image = image / 255.0
-    # Reshape to (256, 256, 1)
-    image = np.reshape(image, (256, 256, 1))
-    # Add batch dimension
+    # Expand the dimensions to create a batch of size 1
     image = np.expand_dims(image, axis=0)
-    
-
-    
     return image
 
-def apply_CLAHE(img:np.array):
-  """
+clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
-  applies the CLAHE enhancement over a given 2D array
 
-  Params:
-    img: image as a NumPy array
 
-  Returns:
-    equalized image
-  """
-
-  src = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-  clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-  return clahe.apply(src)
+def apply_clahe(image):
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)  
+    image = clahe.apply(image)
+    return image
 
 
 
@@ -88,7 +69,7 @@ def apply_sharpen(img:np.array, core=9):
     kernel = np.array([[-1,-1,-1], [-1,core,-1], [-1,-1,-1]])
     return cv2.filter2D(img, -1, kernel)
 
-model = load_model('model/CXR_best_model.h5')
+model = load_model('model/chest_xray_cnn_model.h5')
 
 def predict(image):
     prediction = model.predict(image)
